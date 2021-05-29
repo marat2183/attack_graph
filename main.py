@@ -18,7 +18,7 @@ class Network:
         self.other_routers = other_routers
         self.peers = peers
 
-    def formatize(self):
+    def format_string(self):
         return list(map(lambda x: x[1:], self.peers))
 
 
@@ -32,7 +32,7 @@ class Node:
 
     def set_default_gateway(self, networks):
         for network in networks:
-            t = network.formatize()
+            t = network.format_string()
             if self.ip_addr in t:
                 self.default_gateway = network.main_router
 
@@ -47,7 +47,7 @@ class Node:
     def set_linked_nodes(self, networks, nodes):
         result = []
         for network in networks:
-            temp_list = network.formatize()
+            temp_list = network.format_string()
             if self.ip_addr in temp_list:
                 result += [peer[1:] for peer in network.peers if peer[1:] != self.ip_addr]
             if self.default_gateway in network.other_routers:
@@ -202,7 +202,7 @@ def dfs(start, end, visited, path=None):
     path.pop()
     visited[Nodes_dict[start]] = False
 
-user_input = '192.168.134.1'
+user_input = '192.168.135.1'
 end_input = '192.168.136.2'
 visited = [False] * len(Nodes)
 path = []
@@ -228,6 +228,7 @@ def formatize_to_graph(t_list):
 
 endless_nodes = [node for node in Nodes if (node.vuln_count > 0 and node.get_max_vuln_priv() < 3)]
 print(list(map(lambda x: x.ip_addr, endless_nodes)))
+print('dfs_first')
 for i in range(len(endless_nodes)):
     t = endless_nodes[i].ip_addr
     dfs(start=start, end=endless_nodes[i], visited=visited)
@@ -270,3 +271,38 @@ for i in range(len(t_pop)):
     # plt.show()
     plt.axis("off")
     plt.savefig(f"Graph{i}.png", format="PNG")
+
+
+
+
+def dfs_second(start, visited, path=None, node_c=0):
+    a = start.ip_addr
+    if path is None:
+        path = []
+    visited[Nodes_dict[start]] = True
+    path.append(start.ip_addr)
+    if start.get_max_vuln_priv() < 3:
+        if len(path) > 1:
+            print(path)
+    else:
+        for node in start.linked_nodes:
+            node_c = 0
+            b = node.ip_addr
+            if (visited[Nodes_dict[node]] == False) and node.vuln_count > 0 and start.get_max_vuln_priv() >= 3:
+                node_c += 1
+                dfs_second(node, visited, path, node_c)
+    if node_c == 0:
+        print(path)
+    path.pop()
+    visited[Nodes_dict[start]] = False
+
+user_input = '192.168.134.1'
+end_input = '192.168.136.2'
+visited = [False] * len(Nodes)
+path = []
+for k in Nodes_dict.keys():
+    if user_input == k.ip_addr:
+        start = k
+
+print('dfs_second')
+dfs_second(start=start, visited=[False] * len(Nodes))
