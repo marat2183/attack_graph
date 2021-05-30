@@ -119,56 +119,35 @@ class Handler():
             if self.user_input == n.ip_addr:
                 self.start = n
 
-    def dfs(self, visited, nodes_dict, node_c=0, path=None):
-        if path is None:
-            path = []
-        visited[nodes_dict[self.start]] = True
-        path.append(self.start.ip_addr)
-        if self.start.max_priv < 3:
-            if len(path) > 1:
-                print(path)
-                global fn_res
-                self.fn_res.append(copy.deepcopy(path))
-        else:
-            for node in self.start.linked_nodes:
-                node_c = 0
-                if (visited[nodes_dict[node]] == False) and node.vuln_count > 0 and self.start.max_priv >= 3:
-                    node_c += 1
-                    dfs(node, visited, path, node_c)
-        if node_c == 0:
-            if len(path) > 1:
-                print(path)
-                self.fn_res.append(copy.deepcopy(path))
-        path.pop()
-        visited[nodes_dict[self.start]] = False
-
-    def _format_to_graph(self):
-        prev_len = len(self.fn_res)
+    @staticmethod
+    def format_to_graph():
+        prev_len = len(fn_res)
         for i in range(prev_len):
             a = list()
-            for t in range(len(self.fn_res[i]) - 1):
-                a.append((self.fn_res[i][t], self.fn_res[i][t + 1]))
-            self.fn_res.append(a)
+            for t in range(len(fn_res[i]) - 1):
+                a.append((fn_res[i][t], fn_res[i][t + 1]))
+            fn_res.append(a)
         for i in range(prev_len):
-            del self.fn_res[0]
-        return self.fn_res
+            del fn_res[0]
+        return fn_res
 
-    def _get_default_edges(self, nodes):
+    @staticmethod
+    def get_default_edges(nodes):
         tuple_list = []
         for node in nodes:
             for peer in node.linked_nodes:
                 tuple_list.append((node.ip_addr, peer.ip_addr))
         return tuple_list
 
-    def _get_attack_edges(self, nodes, tuple_list):
-        def_edges = self._get_default_edges(nodes)
-        for i in range(len(def_edges)):
+    @staticmethod
+    def get_attack_edges(def_edges, temp_data):
+        for i in range(len(temp_data)):
             final_list_for_graph = []
-            for m in tuple_list:
-                t_list = self._format_to_graph()
-                if m not in t_list:
+            for m in def_edges:
+                if m not in temp_data:
                     final_list_for_graph.append(m)
-        return t_list, final_list_for_graph
+        return temp_data, final_list_for_graph
+
 
 class Ilustrator():
     def_edge_color = 'black'
@@ -186,25 +165,39 @@ class Ilustrator():
         self.def_edges = def_edges
 
     def create_default_graph(self):
-        pass
-
-    def create_graph_attack_graph(self):
         G = nx.DiGraph()
-        G.add_edges_from(self.attack_edges, color=self.attack_edge_color, weight=self.width)
         G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
-        pos = nx.planar_layout(G)
+        t = nx.planar_layout(G)
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
         plt.figure(figsize=(12, 10))
         pos = nx.planar_layout(G)
-        g_nodes = nx.draw_networkx_nodes(G, pos, node_size=self.node_size, node_color=self.node_color)
-        nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
+        g_nodes = nx.draw_networkx_nodes(G, pos=t, node_size=self.node_size, node_color=self.node_color)
+        nx.draw_networkx_edges(G, pos=t, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
                                connectionstyle=self.connectionstyle)
         g_nodes.set_edgecolor(self.node_edge_color)
-        nx.draw_networkx_labels(G, pos, font_size=self.font_size, font_color=self.font_color)
+        nx.draw_networkx_labels(G, pos=t, font_size=self.font_size, font_color=self.font_color)
         plt.axis("off")
-        plt.savefig(f"Graph.png", format="PNG")
+        plt.savefig(f"def_graph.png", format="PNG")
+
+    def create_graph_attack_graph(self, i):
+        G = nx.DiGraph()
+        G.add_edges_from(self.attack_edges, color=self.attack_edge_color, weight=self.width)
+        G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
+        t = nx.planar_layout(G)
+        edges = G.edges()
+        colors = [G[u][v]['color'] for u, v in edges]
+        weights = [G[u][v]['weight'] for u, v in edges]
+        plt.figure(figsize=(12, 10))
+        pos = nx.planar_layout(G)
+        g_nodes = nx.draw_networkx_nodes(G, pos=t, node_size=self.node_size, node_color=self.node_color)
+        nx.draw_networkx_edges(G, pos=t, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
+                               connectionstyle=self.connectionstyle)
+        g_nodes.set_edgecolor(self.node_edge_color)
+        nx.draw_networkx_labels(G, pos=t, font_size=self.font_size, font_color=self.font_color)
+        plt.axis("off")
+        plt.savefig(f"Graph{i}.png", format="PNG")
 
 
 
@@ -212,7 +205,6 @@ class Ilustrator():
 
 data = Parser()
 vulns_dict = data.parse_vulnerabilies()
-print(vulns_dict)
 networks = data.parse_net_topology()
 nodes_dict = data.parse_nodes()
 nodes = nodes_dict.keys()
@@ -236,7 +228,7 @@ def dfs(start, visited, path=None, node_c=0):
         if len(path) > 1:
             print(path)
             global fn_res
-            fn_res.append(path)
+            fn_res.append(copy.deepcopy(path))
     else:
         for node in start.linked_nodes:
             node_c = 0
@@ -246,31 +238,25 @@ def dfs(start, visited, path=None, node_c=0):
     if node_c == 0:
         if len(path) > 1:
             print(path)
-            fn_res.append(path)
+            fn_res.append(copy.deepcopy(path))
     path.pop()
     visited[nodes_dict[start]] = False
 
-# user_input = '192.168.134.1'
-temp = Handler(user_input='192.168.134.1')
+
+temp = Handler(user_input='192.168.135.1')
 visited = [False] * len(nodes)
 temp.get_node_by_input(nodes_dict)
-temp.dfs(visited=visited, nodes_dict=nodes_dict)
+dfs(temp.start, visited=visited)
+attack_edges_list = temp.format_to_graph()
+def_edges = temp.get_default_edges(nodes)
+result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges)
+result.create_default_graph()
+for i in range(len(attack_edges_list)):
+    temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
+    temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0])
+    temp_res.create_graph_attack_graph(i)
 
-print('dfs_second')
-# dfs(start=start, visited=visited)
 
-
-
-def formatize_to_graph(t_list):
-    prev_len = len(t_list)
-    for i in range(prev_len):
-        a = list()
-        for t in range(len(t_list[i]) - 1):
-            a.append((t_list[i][t], t_list[i][t+1]))
-        t_list.append(a)
-    for i in range(prev_len):
-        del t_list[0]
-    return t_list
 
 
 
