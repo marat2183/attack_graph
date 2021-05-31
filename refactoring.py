@@ -6,7 +6,16 @@ from termcolor import colored
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULT_DIR = ROOT_DIR + '/results'
+PRIV_DICT = {
+    0: 'not vulns',
+    1 : 'other',
+    2: 'guest',
+    3: 'user',
+    4: 'root',
+}
 fn_res = []
+
+
 def dfs(start, visited, path=None, node_c=0):
     if path is None:
         path = []
@@ -193,23 +202,26 @@ class Ilustrator():
         self.figsize = figsize * 2
 
 
-    def create_default_graph(self):
+    def create_default_graph(self, dict_for_graph_nodes):
         G = nx.DiGraph()
-        G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
+        G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width, edgecolor='black')
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
         plt.figure(figsize=(self.figsize, self.figsize - 2))
+        labeldict = {}
+        for node in G.nodes():
+            labeldict[node] = dict_for_graph_nodes[node]
         pos = nx.planar_layout(G)
         g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
         nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
                                connectionstyle=self.connectionstyle)
         g_nodes.set_edgecolor(self.node_edge_color)
-        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
+        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color, labels=labeldict)
         plt.axis("off")
         plt.savefig(f"{RESULT_DIR}/def_graph.png", format="PNG")
 
-    def create_graph_attack_graph(self, i):
+    def create_graph_attack_graph(self, i, dict_for_graph_nodes):
         G = nx.DiGraph()
         G.add_edges_from(self.attack_edges, color=self.attack_edge_color, weight=self.width)
         G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
@@ -217,17 +229,24 @@ class Ilustrator():
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
         plt.figure(figsize=(self.figsize, self.figsize - 2))
+        labeldict = {}
+        for node in G.nodes():
+            labeldict[node] = dict_for_graph_nodes[node]
         pos = nx.planar_layout(G)
         g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
         nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
                                connectionstyle=self.connectionstyle)
         g_nodes.set_edgecolor(self.node_edge_color)
-        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
+        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color, labels=labeldict)
         plt.axis("off")
         plt.savefig(f"{RESULT_DIR}/Graph{i}.png", format="PNG")
 
 
 def main(nodes):
+    for node in nodes:
+        dict_for_graph_nodes[node.ip_addr] = f"{node.ip_addr}\npriv_num: {node.max_priv}\npriv:" \
+                                             f" {PRIV_DICT[node.max_priv]}\nvulns:" \
+                                             f" {node.vuln_count}"
     menu_string = 'Выберите один адрес из доступных:\n'
     ip_addrs = list(map(lambda x: x.ip_addr, nodes))
     for i in ip_addrs:
@@ -247,13 +266,13 @@ def main(nodes):
     dfs(temp.start, visited=visited)
     attack_edges_list = temp.format_to_graph()
     def_edges = temp.get_default_edges(nodes)
-    result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges, figsize = len(nodes))
-    result.create_default_graph()
+    result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges, figsize=len(nodes))
+    result.create_default_graph(dict_for_graph_nodes=dict_for_graph_nodes)
     if len(attack_edges_list) > 0:
         for i in range(len(attack_edges_list)):
             temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
             temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0], figsize = len(nodes))
-            temp_res.create_graph_attack_graph(i)
+            temp_res.create_graph_attack_graph(i=i, dict_for_graph_nodes=dict_for_graph_nodes)
         print(colored("Графы атак успешно построены, результаты в папке \"results\"", "green"))
         return
     else:
@@ -274,6 +293,7 @@ if __name__ == '__main__':
         node.set_default_gateway(networks)
         node.set_linked_nodes(networks, nodes)
         node.set_max_vuln_priv(vulns_dict)
+    dict_for_graph_nodes = {}
     main(nodes)
     # data = Parser()
     # vulns_dict = data.parse_vulnerabilities()
