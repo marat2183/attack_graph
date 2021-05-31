@@ -40,7 +40,7 @@ def parsing_vulns_info():
 
 
 def parsing_nodes_info():
-    with open('test.txt', 'r+') as f:
+    with open('nodes.txt', 'r+') as f:
         Nodes = []
         for line in f.readlines():
             temp = line.strip().split(':')

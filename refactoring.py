@@ -3,8 +3,30 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import test
 import copy
-fn_res = []
 
+fn_res = []
+def dfs(start, visited, path=None, node_c=0):
+    if path is None:
+        path = []
+    visited[nodes_dict[start]] = True
+    path.append(start.ip_addr)
+    if start.max_priv < 3:
+        if len(path) > 1:
+            print(path)
+            global fn_res
+            fn_res.append(copy.deepcopy(path))
+    else:
+        for node in start.linked_nodes:
+            node_c = 0
+            if (visited[nodes_dict[node]] == False) and node.vuln_count > 0 and start.max_priv >= 3:
+                node_c += 1
+                dfs(node, visited, path, node_c)
+    if node_c == 0:
+        if len(path) > 1:
+            print(path)
+            fn_res.append(copy.deepcopy(path))
+    path.pop()
+    visited[nodes_dict[start]] = False
 
 
 class Network:
@@ -35,7 +57,10 @@ class Node:
     def set_max_vuln_priv(self, vulns_dict):
         max_priv = 0
         for vuln in self.vuln:
-            temp = vulns_dict[vuln]
+            try:
+                temp = vulns_dict[vuln]
+            except KeyError:
+                temp = 0
             if temp > max_priv:
                 max_priv = vulns_dict[vuln]
         self.max_priv = max_priv
@@ -53,9 +78,8 @@ class Node:
 
 
 class Parser():
-
     @staticmethod
-    def parse_vulnerabilies():
+    def parse_vulnerabilities():
         vulns_dict = {}
         with open('vulns.txt', 'r+') as f:
             for line in f.readlines():
@@ -94,18 +118,19 @@ class Parser():
 
     @staticmethod
     def parse_nodes():
-        with open('test.txt', 'r+') as f:
+        with open('nodes.txt', 'r+') as f:
             nodes_dict = {}
             n_count = 0
             for line in f.readlines():
                 temp = line.strip().split(':')
-                if temp[1] == '':
+                if temp[1] == 'None':
                     nodes_dict[Node(ip_addr=temp[0], vuln=[])] = n_count
                     n_count += 1
                 else:
                     nodes_dict[Node(ip_addr=temp[0], vuln=temp[1].split(','))] = n_count
                     n_count += 1
         return nodes_dict
+
 
 class Handler():
     def __init__(self, user_input):
@@ -167,17 +192,16 @@ class Ilustrator():
     def create_default_graph(self):
         G = nx.DiGraph()
         G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
-        t = nx.planar_layout(G)
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
         plt.figure(figsize=(12, 10))
         pos = nx.planar_layout(G)
-        g_nodes = nx.draw_networkx_nodes(G, pos=t, node_size=self.node_size, node_color=self.node_color)
-        nx.draw_networkx_edges(G, pos=t, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
+        g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
+        nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
                                connectionstyle=self.connectionstyle)
         g_nodes.set_edgecolor(self.node_edge_color)
-        nx.draw_networkx_labels(G, pos=t, font_size=self.font_size, font_color=self.font_color)
+        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
         plt.axis("off")
         plt.savefig(f"def_graph.png", format="PNG")
 
@@ -185,112 +209,87 @@ class Ilustrator():
         G = nx.DiGraph()
         G.add_edges_from(self.attack_edges, color=self.attack_edge_color, weight=self.width)
         G.add_edges_from(self.def_edges, color=self.def_edge_color, weight=self.width)
-        t = nx.planar_layout(G)
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
         plt.figure(figsize=(12, 10))
         pos = nx.planar_layout(G)
-        g_nodes = nx.draw_networkx_nodes(G, pos=t, node_size=self.node_size, node_color=self.node_color)
-        nx.draw_networkx_edges(G, pos=t, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
+        g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
+        nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
                                connectionstyle=self.connectionstyle)
         g_nodes.set_edgecolor(self.node_edge_color)
-        nx.draw_networkx_labels(G, pos=t, font_size=self.font_size, font_color=self.font_color)
+        nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
         plt.axis("off")
         plt.savefig(f"Graph{i}.png", format="PNG")
 
 
-
-
-
-data = Parser()
-vulns_dict = data.parse_vulnerabilies()
-networks = data.parse_net_topology()
-nodes_dict = data.parse_nodes()
-nodes = nodes_dict.keys()
-
-
-for node in nodes:
-    node.set_default_gateway(networks)
-    node.set_linked_nodes(networks, nodes)
-    node.set_max_vuln_priv(vulns_dict)
-
-
-
-
-
-def dfs(start, visited, path=None, node_c=0):
-    if path is None:
-        path = []
-    visited[nodes_dict[start]] = True
-    path.append(start.ip_addr)
-    if start.max_priv < 3:
-        if len(path) > 1:
-            print(path)
-            global fn_res
-            fn_res.append(copy.deepcopy(path))
+def main(nodes):
+    menu_string = 'Выберите один адрес из доступных:\n'
+    ip_addrs = list(map(lambda x: x.ip_addr, nodes))
+    for i in ip_addrs:
+        menu_string += i + '\n'
+    print(menu_string)
+    u_input = input("Введите ip адрес: ")
+    is_correct = False
+    while not is_correct:
+        if u_input not in ip_addrs:
+            print("Некорректные данные")
+            u_input = input("Введите ip адрес: ")
+        else:
+            is_correct = True
+    temp = Handler(user_input=u_input)
+    visited = [False] * len(nodes)
+    temp.get_node_by_input(nodes_dict)
+    dfs(temp.start, visited=visited)
+    attack_edges_list = temp.format_to_graph()
+    def_edges = temp.get_default_edges(nodes)
+    result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges)
+    result.create_default_graph()
+    if len(attack_edges_list) > 0:
+        for i in range(len(attack_edges_list)):
+            temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
+            temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0])
+            temp_res.create_graph_attack_graph(i)
+        print("Графы атак успешно построены")
+        return
     else:
-        for node in start.linked_nodes:
-            node_c = 0
-            if (visited[nodes_dict[node]] == False) and node.vuln_count > 0 and start.max_priv >= 3:
-                node_c += 1
-                dfs(node, visited, path, node_c)
-    if node_c == 0:
-        if len(path) > 1:
-            print(path)
-            fn_res.append(copy.deepcopy(path))
-    path.pop()
-    visited[nodes_dict[start]] = False
+        print('Граф атаки пуст, так как на указанном узле нет уязвимости с нужным уровнем доступа')
+        return
 
 
-temp = Handler(user_input='192.168.135.1')
-visited = [False] * len(nodes)
-temp.get_node_by_input(nodes_dict)
-dfs(temp.start, visited=visited)
-attack_edges_list = temp.format_to_graph()
-def_edges = temp.get_default_edges(nodes)
-result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges)
-result.create_default_graph()
-for i in range(len(attack_edges_list)):
-    temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
-    temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0])
-    temp_res.create_graph_attack_graph(i)
-
-
-
-
-
-
-# t_pop = formatize_to_graph(fn_res)
-# #Топология без атак
-# tuple_list = []
-# for node in nodes:
-#     for peer in node.linked_nodes:
-#         tuple_list.append((node.ip_addr, peer.ip_addr))
-#
-# for i in range(len(t_pop)):
-#     final_list_for_graph = []
-#     for m in tuple_list:
-#         if m not in t_pop[i]:
-#             final_list_for_graph.append(m)
-#
-#     G = nx.DiGraph()
-#     G.add_edges_from(t_pop[i], color='red', weight=1)
-#     G.add_edges_from(final_list_for_graph, color='black', weight=1)
-#     pos = nx.planar_layout(G)
-#     edges = G.edges()
-#     colors = [G[u][v]['color'] for u,v in edges]
-#     weights = [G[u][v]['weight'] for u,v in edges]
-#     plt.figure(figsize=(12, 10))
-#     pos = nx.planar_layout(G)
-#     g_nodes = nx.draw_networkx_nodes(G, pos, node_size=5000, node_color='grey')
-#     nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=colors, node_size=5000, width=weights,
-#                            connectionstyle='arc3, rad = 0.03')
-#     g_nodes.set_edgecolor('black')
-#     nx.draw_networkx_labels(G, pos, font_size=8, font_color='black')
-#     plt.axis("off")
-#     plt.savefig(f"Graph{i}.png", format="PNG")
-
-
-
-
+if __name__ == '__main__':
+    data = Parser()
+    vulns_dict = data.parse_vulnerabilities()
+    networks = data.parse_net_topology()
+    nodes_dict = data.parse_nodes()
+    nodes = nodes_dict.keys()
+    for node in nodes:
+        node.set_default_gateway(networks)
+        node.set_linked_nodes(networks, nodes)
+        node.set_max_vuln_priv(vulns_dict)
+    main(nodes)
+    # data = Parser()
+    # vulns_dict = data.parse_vulnerabilities()
+    # networks = data.parse_net_topology()
+    # nodes_dict = data.parse_nodes()
+    # nodes = nodes_dict.keys()
+    # for node in nodes:
+    #     node.set_default_gateway(networks)
+    #     node.set_linked_nodes(networks, nodes)
+    #     node.set_max_vuln_priv(vulns_dict)
+    #
+    # temp = Handler(user_input='192.168.134.1')
+    # visited = [False] * len(nodes)
+    # temp.get_node_by_input(nodes_dict)
+    # dfs(temp.start, visited=visited)
+    # attack_edges_list = temp.format_to_graph()
+    # def_edges = temp.get_default_edges(nodes)
+    # result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges)
+    # result.create_default_graph()
+    # if len(attack_edges_list) > 0:
+    #     for i in range(len(attack_edges_list)):
+    #         temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
+    #         temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0])
+    #         temp_res.create_graph_attack_graph(i)
+    # else:
+    #     print('Граф атаки пуст, так как на указанном узле нет уязвимости с нужным уровнем доступа')
