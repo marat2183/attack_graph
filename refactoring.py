@@ -1,9 +1,11 @@
-import numpy
 import networkx as nx
 import matplotlib.pyplot as plt
-import test
 import copy
+import os
+from termcolor import colored
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+RESULT_DIR = ROOT_DIR + '/results'
 fn_res = []
 def dfs(start, visited, path=None, node_c=0):
     if path is None:
@@ -185,9 +187,11 @@ class Ilustrator():
     font_size = 8
     font_color = 'black'
 
-    def __init__(self, attack_edges, def_edges):
+    def __init__(self, attack_edges, def_edges, figsize):
         self.attack_edges = attack_edges
         self.def_edges = def_edges
+        self.figsize = figsize * 2
+
 
     def create_default_graph(self):
         G = nx.DiGraph()
@@ -195,7 +199,7 @@ class Ilustrator():
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
-        plt.figure(figsize=(12, 10))
+        plt.figure(figsize=(self.figsize, self.figsize - 2))
         pos = nx.planar_layout(G)
         g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
         nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
@@ -203,7 +207,7 @@ class Ilustrator():
         g_nodes.set_edgecolor(self.node_edge_color)
         nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
         plt.axis("off")
-        plt.savefig(f"def_graph.png", format="PNG")
+        plt.savefig(f"{RESULT_DIR}/def_graph.png", format="PNG")
 
     def create_graph_attack_graph(self, i):
         G = nx.DiGraph()
@@ -212,7 +216,7 @@ class Ilustrator():
         edges = G.edges()
         colors = [G[u][v]['color'] for u, v in edges]
         weights = [G[u][v]['weight'] for u, v in edges]
-        plt.figure(figsize=(12, 10))
+        plt.figure(figsize=(self.figsize, self.figsize - 2))
         pos = nx.planar_layout(G)
         g_nodes = nx.draw_networkx_nodes(G, pos=pos, node_size=self.node_size, node_color=self.node_color)
         nx.draw_networkx_edges(G, pos=pos, edgelist=edges, edge_color=colors, node_size=self.node_size, width=weights,
@@ -220,20 +224,20 @@ class Ilustrator():
         g_nodes.set_edgecolor(self.node_edge_color)
         nx.draw_networkx_labels(G, pos=pos, font_size=self.font_size, font_color=self.font_color)
         plt.axis("off")
-        plt.savefig(f"Graph{i}.png", format="PNG")
+        plt.savefig(f"{RESULT_DIR}/Graph{i}.png", format="PNG")
 
 
 def main(nodes):
     menu_string = 'Выберите один адрес из доступных:\n'
     ip_addrs = list(map(lambda x: x.ip_addr, nodes))
     for i in ip_addrs:
-        menu_string += i + '\n'
+        menu_string += colored(i, 'green') + '\n'
     print(menu_string)
     u_input = input("Введите ip адрес: ")
     is_correct = False
     while not is_correct:
         if u_input not in ip_addrs:
-            print("Некорректные данные")
+            print(colored("Некорректные данные", 'red'))
             u_input = input("Введите ip адрес: ")
         else:
             is_correct = True
@@ -243,21 +247,24 @@ def main(nodes):
     dfs(temp.start, visited=visited)
     attack_edges_list = temp.format_to_graph()
     def_edges = temp.get_default_edges(nodes)
-    result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges)
+    result = Ilustrator(attack_edges=attack_edges_list, def_edges=def_edges, figsize = len(nodes))
     result.create_default_graph()
     if len(attack_edges_list) > 0:
         for i in range(len(attack_edges_list)):
             temp_tuple = temp.get_attack_edges(def_edges=def_edges, temp_data=attack_edges_list[i])
-            temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0])
+            temp_res = Ilustrator(def_edges=temp_tuple[1], attack_edges=temp_tuple[0], figsize = len(nodes))
             temp_res.create_graph_attack_graph(i)
-        print("Графы атак успешно построены")
+        print(colored("Графы атак успешно построены, результаты в папке \"results\"", "green"))
         return
     else:
-        print('Граф атаки пуст, так как на указанном узле нет уязвимости с нужным уровнем доступа')
+        print(colored("Граф атаки пуст, так как на указанном узле нет уязвимости с нужным уровнем доступа", "green"))
         return
 
 
 if __name__ == '__main__':
+    for root, dirs, files in os.walk(RESULT_DIR):
+        for file in files:
+            os.remove(os.path.join(root, file))
     data = Parser()
     vulns_dict = data.parse_vulnerabilities()
     networks = data.parse_net_topology()
